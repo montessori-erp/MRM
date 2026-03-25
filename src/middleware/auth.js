@@ -83,6 +83,7 @@ export const roleCheck = (roles) => {
     next();
   };
 };
-
+export const adminOrSuper = roleCheck(['Admin', 'Super-Admin']);
+export const superAdminOnly = roleCheck(['Super-Admin']);
 export const protect = authMiddleware;
 export const restrictTo = roleCheck;
