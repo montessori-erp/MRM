@@ -34,37 +34,40 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+const COOKIE_NAME = process.env.COOKIE_NAME || 'dream_token';
+
 export const authMiddleware = async (req, res, next) => {
   let token;
-
-  // Check header for 'Bearer <token>'
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies?.[COOKIE_NAME]) {
+    token = req.cookies[COOKIE_NAME];
   }
 
-  if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
-  }
+  if (!token) return res.status(401).json({ message: 'Not authorized' });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-    
+    const user = await User.findById(decoded.id).select('-password').populate('departmentId', 'name');
     if (!user) return res.status(401).json({ message: 'User not found' });
-    
     req.user = user;
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
+    return res.status(401).json({ message: 'Invalid token' });
   }
 };
 
-// Re-add these exports so your routes don't crash
-export const protect = authMiddleware;
-export const adminOrSuper = (req, res, next) => {
-  if (req.user && ['Admin', 'Super-Admin'].includes(req.user.role)) {
+// The Function
+export const roleCheck = (roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Permission denied' });
+    }
     next();
-  } else {
-    res.status(403).json({ message: 'Access denied' });
-  }
+  };
 };
+
+// ALIASES - This is what fixes your crash!
+export const protect = authMiddleware; 
+export const restrictTo = roleCheck;
+export const adminOrSuper = roleCheck(['Admin', 'Super-Admin']);
