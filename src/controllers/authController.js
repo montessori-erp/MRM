@@ -136,12 +136,35 @@ export const forgotPassword = async (req, res) => {
 
     // Move transporter configuration outside or to a utility to save memory
     const transporter = nodemailer.createTransport({
-      service: 'Gmail',
+      service: 'gmail', // Keep this
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, 
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // Ensure this is a 16-char App Password
+        pass: process.env.EMAIL_PASS,
       },
-    });
+    });  
+
+
+
+    //    const transporter = nodemailer.createTransport({
+//   host: 'smtp.gmail.com',
+//   port: 465,
+//   secure: true, // Use SSL
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASS,
+//   },
+// });
+   
+    // const transporter = nodemailer.createTransport({
+    //   service: 'Gmail',
+    //   auth: {
+    //     user: process.env.EMAIL_USER,
+    //     pass: process.env.EMAIL_PASS, // Ensure this is a 16-char App Password
+    //   },
+    // });
 
     const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
