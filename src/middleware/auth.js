@@ -31,31 +31,30 @@
 // export const superAdminOnly = restrictTo('Super-Admin');
 
 
-
-
-
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 const COOKIE_NAME = process.env.COOKIE_NAME || 'dream_token';
 
-/**
- * @desc    Main authentication middleware
- * @alias   Previously named 'protect'
- */
 export const authMiddleware = async (req, res, next) => {
-  // Check for token in Cookies OR Authorization Header
-  let token = req.cookies?.[COOKIE_NAME] || req.headers?.authorization?.replace('Bearer ', '');
+  let token;
+
+  // 1. Check for token in Authorization Header (Standard)
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  } 
+  // 2. Fallback to Cookies
+  else if (req.cookies?.[COOKIE_NAME]) {
+    token = req.cookies[COOKIE_NAME];
+  }
 
   if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
+    return res.status(401).json({ message: 'Not authorized, no token provided' });
   }
 
   try {
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from DB, populate department, and exclude password
     const user = await User.findById(decoded.id)
       .select('-password')
       .populate('departmentId', 'name');
@@ -68,7 +67,6 @@ export const authMiddleware = async (req, res, next) => {
       return res.status(403).json({ message: 'Account deactivated' });
     }
 
-    // Attach user to the request object
     req.user = user;
     next();
   } catch (err) {
@@ -77,26 +75,14 @@ export const authMiddleware = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Role-based access control
- * @alias   Previously named 'restrictTo'
- * @param   {String[]} roles - Array of allowed roles (e.g., ['Director', 'Super-Admin'])
- */
 export const roleCheck = (roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        message: 'You do not have permission for this action' 
-      });
+      return res.status(403).json({ message: 'Permission denied' });
     }
     next();
   };
 };
 
-// --- Legacy Helpers (Optional - keep if used elsewhere) ---
-export const adminOrSuper = roleCheck(['Admin', 'Super-Admin']);
-export const superAdminOnly = roleCheck(['Super-Admin']);
-
-
-export const protect = authMiddleware; 
+export const protect = authMiddleware;
 export const restrictTo = roleCheck;
