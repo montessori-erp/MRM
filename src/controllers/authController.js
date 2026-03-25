@@ -855,8 +855,6 @@
 
 
 
-
-
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
@@ -890,31 +888,21 @@ export const getRegistrationStatus = async (req, res) => {
   }
 };
 
-// --- 2. LOGIN (Integrated with Debugging) ---
+// --- 2. LOGIN (Fixed with Token in Body) ---
 export const login = async (req, res) => {
   try {
     const email = req.body.email.toLowerCase().trim();
     const { password } = req.body;
 
-    console.log("--- DEBUG START ---");
-    console.log("Login Email Attempt:", email);
-    console.log("Login Password Attempt:", password);
-
     // Explicitly select password and populate department
     const user = await User.findOne({ email }).select('+password').populate('departmentId', 'name');
     
     if (!user) {
-      console.log("❌ Result: User not found in database.");
-      console.log("--- DEBUG END ---");
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    console.log("Stored Hash in DB:", user.password);
-
     // Use the model method to compare
     const isMatch = await user.comparePassword(password, user.password);
-    console.log("Is Match Result:", isMatch);
-    console.log("--- DEBUG END ---");
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -925,18 +913,26 @@ export const login = async (req, res) => {
     }
 
     const token = signToken(user._id);
+    
+    // Set Cookie for extra security
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
     
     const u = user.toObject();
     delete u.password;
-    res.json({ user: u, message: 'Logged in successfully' });
+
+    // THE FIX: Included 'token' so Frontend LocalStorage can save it
+    res.json({ 
+      token, 
+      user: u, 
+      message: 'Logged in successfully' 
+    });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// --- 3. REGISTER ---
+// --- 3. REGISTER (Fixed with Token in Body) ---
 export const register = async (req, res) => {
   try {
     const { name, email, password, role, departmentId } = req.body;
@@ -965,7 +961,13 @@ export const register = async (req, res) => {
     
     const u = user.toObject();
     delete u.password;
-    res.status(201).json({ user: u, message: 'Registered successfully' });
+
+    // Added token here so user is logged in immediately after registration
+    res.status(201).json({ 
+      token, 
+      user: u, 
+      message: 'Registered successfully' 
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1017,7 +1019,7 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-// --- 5. RESET PASSWORD ---
+// --- 5. RESET PASSWORD (Fixed with Token in Body) ---
 export const resetPassword = async (req, res) => {
   try {
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
@@ -1040,7 +1042,11 @@ export const resetPassword = async (req, res) => {
     const token = signToken(user._id);
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
 
-    res.status(200).json({ message: 'Password reset successful' });
+    // Added token so user doesn't have to log in manually after reset
+    res.status(200).json({ 
+      token, 
+      message: 'Password reset successful' 
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1055,6 +1061,3 @@ export const logout = async (req, res) => {
   res.cookie(COOKIE_NAME, '', { ...COOKIE_OPTS, maxAge: 0 });
   res.json({ message: 'Logged out' });
 };
-
-
-
